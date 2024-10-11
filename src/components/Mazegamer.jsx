@@ -1,29 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import Confetti from 'react-confetti';  // Import a confetti package
+import Confetti from 'react-confetti'; // Import confetti package
 
 const Maze = () => {
   const [maze, setMaze] = useState([]);
-  const [playerPos, setPlayerPos] = useState([1, 1]);  // Player's starting position
-  const [start, setStart] = useState([1, 1]);  // Start point
-  const [end, setEnd] = useState([13, 13]);   // End point (depends on difficulty)
+  const [playerPos, setPlayerPos] = useState([1, 1]); // Player's starting position
+  const [start, setStart] = useState([1, 1]); // Start point
+  const [end, setEnd] = useState([13, 13]); // End point (depends on difficulty)
   const [difficulty, setDifficulty] = useState('easy'); // Default difficulty
   const [mazeSize, setMazeSize] = useState(15); // Default maze size for easy
   const [gameWon, setGameWon] = useState(false); // Track if game is won
+  const [footprints, setFootprints] = useState([]); // Array to track player's footsteps
+  const [steps, setSteps] = useState(0); // Track player's steps
+  const [minSteps, setMinSteps] = useState(null); // Minimum steps required for the maze
 
   // Update maze size and end position based on difficulty level
   const updateMazeSize = (difficulty) => {
     if (difficulty === 'easy') {
-      setMazeSize(15);
-      setEnd([13, 13]);
+      setMazeSize(10);
+      setEnd([8, 8]);
     } else if (difficulty === 'medium') {
-      setMazeSize(25);
-      setEnd([23, 23]);
+      setMazeSize(15);
+      setEnd([15, 15]);
     } else if (difficulty === 'hard') {
-      setMazeSize(41);
-      setEnd([39, 39]);
+      setMazeSize(20);
+      setEnd([20, 20]);
     } else if (difficulty === 'super-hard') {
-      setMazeSize(61);
-      setEnd([59, 59]);
+      setMazeSize(25);
+      setEnd([25, 25]);
     }
   };
 
@@ -39,21 +42,21 @@ const Maze = () => {
     const shuffle = (array) => array.sort(() => Math.random() - 0.5);
 
     const dfs = (x, y) => {
-      grid[x][y] = 1;  // Mark current cell as part of the path
-      shuffle(directions);  // Shuffle directions to randomize the maze
+      grid[x][y] = 1; // Mark current cell as part of the path
+      shuffle(directions); // Shuffle directions to randomize the maze
 
       for (let [dx, dy] of directions) {
         const nx = x + dx * 2, ny = y + dy * 2;
         if (nx > 0 && nx < rows && ny > 0 && ny < cols && grid[nx][ny] === 0) {
-          grid[x + dx][y + dy] = 1;  // Carve a path between current and next cell
-          dfs(nx, ny);  // Recur for the next cell
+          grid[x + dx][y + dy] = 1; // Carve a path between current and next cell
+          dfs(nx, ny); // Recur for the next cell
         }
       }
     };
 
-    dfs(1, 1);  // Start DFS from the top-left corner
-    grid[0][1] = 1;  // Ensure entrance
-    grid[rows - 2][cols - 1] = 1;  // Ensure exit
+    dfs(1, 1); // Start DFS from the top-left corner
+    grid[0][1] = 1; // Ensure entrance
+    grid[rows - 2][cols - 1] = 1; // Ensure exit
 
     // Ensure Start and End are open and connected
     grid[1][1] = 1;
@@ -62,15 +65,49 @@ const Maze = () => {
   };
 
   useEffect(() => {
-    updateMazeSize(difficulty);  // Update maze size based on difficulty
-    setMaze(generateMaze(mazeSize, mazeSize));
-    setPlayerPos([1, 1]);  // Reset player position to start
-    setGameWon(false);  // Reset game won state
+    updateMazeSize(difficulty); // Update maze size based on difficulty
+    const generatedMaze = generateMaze(mazeSize, mazeSize);
+    setMaze(generatedMaze);
+    setPlayerPos([1, 1]); // Reset player position to start
+    setGameWon(false); // Reset game won state
+    setFootprints([]); // Reset footprints
+    setSteps(0); // Reset steps
+    calculateMinSteps(generatedMaze); // Calculate minimum steps using BFS
   }, [difficulty, mazeSize]);
+
+  // Function to calculate minimum steps using BFS
+  const calculateMinSteps = (maze) => {
+    const queue = [[...start, 0]]; // [x, y, distance]
+    const visited = Array(mazeSize).fill(null).map(() => Array(mazeSize).fill(false));
+    visited[start[0]][start[1]] = true;
+
+    const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+    while (queue.length > 0) {
+      const [x, y, dist] = queue.shift();
+
+      // If we reached the end point, return the distance
+      if (x === end[0] && y === end[1]) {
+        setMinSteps(dist);
+        return;
+      }
+
+      for (const [dx, dy] of directions) {
+        const nx = x + dx, ny = y + dy;
+        if (
+          nx >= 0 && ny >= 0 && nx < mazeSize && ny < mazeSize &&
+          maze[nx][ny] === 1 && !visited[nx][ny]
+        ) {
+          visited[nx][ny] = true;
+          queue.push([nx, ny, dist + 1]);
+        }
+      }
+    }
+  };
 
   // Function to move the player
   const movePlayer = (direction) => {
-    const [x, y] = playerPos;  // Current player position
+    const [x, y] = playerPos; // Current player position
     let newX = x, newY = y;
 
     // Determine new position based on direction
@@ -88,10 +125,13 @@ const Maze = () => {
       maze[newX][newY] === 1
     ) {
       setPlayerPos([newX, newY]);
+      setFootprints([...footprints, [newX, newY]]); // Record the player's step
 
       // Check if the player has reached the end of the maze
       if (newX === end[0] && newY === end[1]) {
-        setGameWon(true);  // Set game won state to true
+        setGameWon(true); // Set game won state to true
+      } else {
+        setSteps((prevSteps) => prevSteps + 1); // Increment step count only if not won
       }
     }
   };
@@ -99,21 +139,32 @@ const Maze = () => {
   // Add event listener to detect key presses for movement
   useEffect(() => {
     const handleKeyDown = (e) => {
-      movePlayer(e.key);  // Call movePlayer with the pressed key
+      movePlayer(e.key); // Call movePlayer with the pressed key
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [playerPos, maze]);
 
-  return (
-    <div className="flex flex-col items-center justify-center">
+  // Calculate the remaining distance (dynamic)
+  const remainingDistance = Math.abs(end[0] - playerPos[0]) + Math.abs(end[1] - playerPos[1]);
 
+  // Function to close the winning popup
+  const closeModal = () => {
+    setGameWon(false); // Close the winning modal
+    // Reset the game if desired
+    setPlayerPos([1, 1]);
+    setFootprints([]);
+    setSteps(0);
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center max-h-screen">
       {/* Difficulty selection */}
-      <div className="mb-6">
+      <div className="flex mb-4">
         <label className="text-xl font-bold">Select Difficulty: </label>
         <select
           className="ml-4 px-2 py-1 border rounded"
@@ -126,43 +177,60 @@ const Maze = () => {
           <option value="super-hard">Super Hard</option>
         </select>
       </div>
+      <p className="text-green-800 text-xl">Remaining Distance: {remainingDistance} cells</p>
 
-      <div className="grid border-purple-700 p-3" style={{ gridTemplateColumns: `repeat(${maze.length}, 1fr)` }}>
+      {/* Maze grid */}
+      <div
+        className="grid p-3 place-items-center"
+        style={{
+          gridTemplateColumns: `repeat(${maze.length}, 1fr)`,
+          width: '100%',
+          maxWidth: '600px', // Ensures responsiveness
+        }}
+      >
         {maze.map((row, rowIndex) =>
           row.map((cell, colIndex) => (
             <div
               key={`${rowIndex}-${colIndex}`}
-              className={`w-4 h-4 border ${
-                cell === 1
-                  ? 'bg-white border-gray-300'
-                  : 'bg-black border-gray-700'
+              className={`w-6 h-6 md:w-8 md:h-8 border ${
+                cell === 1 ? 'bg-white' : 'bg-slate-600'
+              } ${
+                playerPos[0] === rowIndex && playerPos[1] === colIndex
+                  ? 'bg-sky-700' // Player's current position color
+                  : ''
+              } ${
+                start[0] === rowIndex && start[1] === colIndex
+                  ? 'bg-red-500' // Start block color
+                  : ''
+              } ${
+                end[0] === rowIndex && end[1] === colIndex
+                  ? 'bg-green-600' // End block color
+                  : ''
               }`}
-              style={{
-                ...(rowIndex === playerPos[0] && colIndex === playerPos[1] && {
-                  backgroundColor: 'blue',  // Player's current position
-                }),
-                ...(rowIndex === start[0] && colIndex === start[1] && {
-                  backgroundColor: 'red',   // Start position
-                }),
-                ...(rowIndex === end[0] && colIndex === end[1] && {
-                  backgroundColor: 'green', // End position
-                }),
-              }}
             />
           ))
         )}
       </div>
 
-      {/* Confetti/firecracker effect */}
+      {/* Game won popup */}
       {gameWon && (
-        <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center">
-          <Confetti />
-          <div className="bg-white p-6 shadow-lg rounded text-center">
-            <h1 className="text-2xl font-bold">🎉 Congratulations! 🎉</h1>
-            <p>You reached the end of the maze!</p>
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg text-center">
+            <h2 className="text-2xl font-bold">Congratulations!</h2>
+            <p>You reached the destination in {steps} steps!</p>
+            <p>Minimum required steps: {minSteps}</p>
+            <button
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+              onClick={closeModal}
+            >
+              Close
+            </button>
           </div>
+          <Confetti /> {/* Add confetti effect on win */}
         </div>
       )}
+
+     
     </div>
   );
 };
