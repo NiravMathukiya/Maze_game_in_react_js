@@ -183,54 +183,46 @@ const Maze = () => {
       <div
         className="grid p-3 place-items-center"
         style={{
-          gridTemplateColumns: `repeat(${maze.length}, 1fr)`,
-          width: '100%',
-          maxWidth: '600px', // Ensures responsiveness
+          gridTemplateColumns: `repeat(${mazeSize}, 40px)`,
+          gridTemplateRows: `repeat(${mazeSize}, 40px)`,
         }}
       >
         {maze.map((row, rowIndex) =>
-          row.map((cell, colIndex) => (
-            <div
-              key={`${rowIndex}-${colIndex}`}
-              className={`w-6 h-6 md:w-8 md:h-8 border ${
-                cell === 1 ? 'bg-white' : 'bg-slate-600'
-              } ${
-                playerPos[0] === rowIndex && playerPos[1] === colIndex
-                  ? 'bg-sky-700' // Player's current position color
-                  : ''
-              } ${
-                start[0] === rowIndex && start[1] === colIndex
-                  ? 'bg-red-500' // Start block color
-                  : ''
-              } ${
-                end[0] === rowIndex && end[1] === colIndex
-                  ? 'bg-green-600' // End block color
-                  : ''
-              }`}
-            />
-          ))
+          row.map((cell, colIndex) => {
+            // Determine className based on the cell type
+            let cellClass = "border border-gray-300 w-10 h-10 flex items-center justify-center";
+            if (rowIndex === start[0] && colIndex === start[1]) {
+              cellClass += " bg-blue-600"; // Start cell
+            } else if (rowIndex === end[0] && colIndex === end[1]) {
+              cellClass += " bg-red-600"; // End cell
+            } else if (rowIndex === playerPos[0] && colIndex === playerPos[1]) {
+              cellClass += " bg-green-500"; // Player cell
+            } else if (cell === 0) {
+              cellClass += " bg-gray-600"; // Wall
+            } else {
+              cellClass += " bg-white"; // Path
+            }
+            return <div key={`${rowIndex}-${colIndex}`} className={cellClass} />;
+          })
         )}
       </div>
 
-      {/* Game won popup */}
+      {/* Winning popup */}
       {gameWon && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-lg text-center">
-            <h2 className="text-2xl font-bold">Congratulations!</h2>
-            <p>You reached the destination in {steps} steps!</p>
-            <p>Minimum required steps: {minSteps}</p>
-            <button
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
-              onClick={closeModal}
-            >
-              Close
+          <div className="bg-white p-4 rounded">
+            <h2 className="text-xl font-bold">Congratulations! You've reached the end!</h2>
+            <p>You completed the maze in {steps} steps.</p>
+            {minSteps && <p>Minimum steps required: {minSteps}</p>}
+            <button className="mt-2 bg-blue-500 text-white px-4 py-2 rounded" onClick={closeModal}>
+              Play Again
             </button>
           </div>
-          <Confetti /> {/* Add confetti effect on win */}
         </div>
       )}
 
-     
+      {/* Confetti effect */}
+      {gameWon && <Confetti />}
     </div>
   );
 };
